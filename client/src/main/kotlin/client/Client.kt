@@ -74,7 +74,9 @@ class Client(
                     lastConfirmedServerId = update.assignedId!!
                 }
             }
+        // This is an update from another client, processed by the server
         } else {
+            // If some local updates are not yet acknowledged, updates from the server are stored
             if (unconfirmedUpdates.isNotEmpty()) {
                 unappliedUpdates.add(update)
             } else {
