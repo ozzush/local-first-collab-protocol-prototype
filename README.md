@@ -23,7 +23,7 @@ and as of now the client can't be recovered.
     ./gradlew :client:run --args="--name veronika" --console=plain
     ```
     ```bash
-    ./gradlew :client:run --args="--name dmitrii" --console=plain
+    ./gradlew :client:run --args="--name dmitry" --console=plain
     ```
 
 2. Cut off connection between the clients and the server
