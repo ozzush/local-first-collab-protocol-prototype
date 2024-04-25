@@ -42,4 +42,4 @@ both clients.
     sudo iptables -F OUTPUT
     ```
 
-    After a few seconds both clients should print a log that contain all the updates
+    After a few seconds both clients should print a log that contains all the updates
