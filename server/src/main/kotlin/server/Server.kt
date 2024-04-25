@@ -49,10 +49,17 @@ class Server(
     }
 
     private fun shouldCommit(update: ClientUpdate): Boolean {
-        if (!update.basedOnLocal) return update.baseTxnId == baseTxnId()
-        val lastCommitByAuthor = log.lastFromAuthor(update.author) ?: return false
-        if (lastCommitByAuthor.initialId == update.baseTxnId) return true
-        return update.newTxnId != -1L
+        if (update.basedOnLocal) {
+            val lastCommitByAuthor = log.lastFromAuthor(update.author)
+            if (lastCommitByAuthor == null || lastCommitByAuthor.initialId != update.baseTxnId) {
+                LOG.info("Update from client ${update.author} is based on his " +
+                         "local update ${update.baseTxnId} " +
+                         "but the previous commit from this client " +
+                         "is numbered ${lastCommitByAuthor?.initialId}")
+                return false
+            }
+        }
+        return update.newTxnId != 0L
     }
 
     private fun baseTxnId() = log.last().assignedId!!

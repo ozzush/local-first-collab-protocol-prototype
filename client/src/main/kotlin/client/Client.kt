@@ -56,9 +56,8 @@ class Client(
         if (update.author == name) {
             // This update was generated locally
             if (update.assignedId == null) {
-                log.add(update)
                 val base = baseTxnId()
-                check(base != update.initialId)
+                log.add(update)
                 val clientUpdate = ClientUpdate(name, base, update.initialId, hasUnconfirmedUpdates())
                 unconfirmedUpdates.add(clientUpdate)
                 channelScope.launch {
