@@ -25,6 +25,11 @@ class Client(
 
     private val log = LogModel()
 
+    private var localLog: LogModel? = null
+
+    private val displayedLog
+        get() = localLog ?: log
+
     private var currentJob: Job? = null
 
     fun start() {
@@ -32,6 +37,7 @@ class Client(
             LOG.info("Processing updates")
             for (update in updateInputChannel) {
                 processUpdate(update)
+                println("Current log: ${displayedLog.data()}")
             }
         }
     }
@@ -57,7 +63,8 @@ class Client(
             // This update was generated locally
             if (update.assignedId == null) {
                 val base = baseTxnId()
-                log.add(update)
+                if (localLog == null) localLog = log.deepCopy()
+                localLog!!.add(update)
                 val clientUpdate = ClientUpdate(name, base, update.initialId, hasUnconfirmedUpdates())
                 unconfirmedUpdates.add(clientUpdate)
                 channelScope.launch {
@@ -66,29 +73,18 @@ class Client(
             // This is an acknowledgement from the server
             } else {
                 unconfirmedUpdates.removeAt(0)
+                log.add(update)
                 if (unconfirmedUpdates.isEmpty()) {
-                    if (unappliedUpdates.isNotEmpty()) {
-                        log += unappliedUpdates
-                        unappliedUpdates.clear()
-                    }
-                    lastConfirmedServerId = update.assignedId!!
+                    localLog = null
                 }
             }
         // This is an update from another client, processed by the server
         } else {
-            // If some local updates are not yet acknowledged, updates from the server are stored
-            if (unconfirmedUpdates.isNotEmpty()) {
-                unappliedUpdates.add(update)
-            } else {
-                log.add(update)
-            }
+            log.add(update)
         }
     }
 
-    private fun baseTxnId() =
-        if (hasUnconfirmedUpdates()) log.last().initialId else lastConfirmedServerId
-
-    private var lastConfirmedServerId: Long = 1
+    private fun baseTxnId() = localLog?.last()?.initialId ?: log.last().assignedId!!
 
     private fun hasUnconfirmedUpdates() = unconfirmedUpdates.isNotEmpty()
 }
