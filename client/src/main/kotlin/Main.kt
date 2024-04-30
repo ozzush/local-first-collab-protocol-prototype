@@ -4,24 +4,31 @@ import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.int
-import common.ClientUpdate
+import com.github.ajalt.clikt.parameters.types.long
+import common.RandomStringGenerator
 import common.UpdateDescriptor
+import common.UpdateStatus
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
-import java.lang.Exception
 import java.util.concurrent.Executors
 
 fun main(args: Array<String>) = DevClientMain().main(args)
 
 class DevClientMain : CliktCommand() {
     private val name by option("--name", help = "Name that identifies this client").required()
+    private val port by option("--port", help = "HTTP port to connect to").int()
+        .default(9000)
     private val wsPort by option("--ws-port", help = "WebSocket port to connect to").int()
         .default(9001)
     private val host by option("--host", help = "Address of the server").default("localhost")
+    private val fetchResource by option("--fetch-resource", help = "HTTP resource to fetch the most recent version of the project from")
+        .default("fetch")
+    private val seed by option("--seed", help = "Seed for the random string generator. Defaults to the name's hash").long()
 
     override fun run() {
+        val uidGenerator = RandomStringGenerator(seed ?: name.hashCode().toLong())
         val updateInputChannel = Channel<UpdateDescriptor>()
-        val serverPostChannel = Channel<ClientUpdate>()
+        val serverPostChannel = Channel<UpdateDescriptor>()
         val updateInputScope = CoroutineScope(
             Executors.newSingleThreadExecutor().asCoroutineDispatcher()
         )
@@ -29,7 +36,9 @@ class DevClientMain : CliktCommand() {
             Executors.newSingleThreadExecutor().asCoroutineDispatcher()
         )
 
-        val client = Client(name, updateInputChannel, serverPostChannel)
+        val fetchClient = FetchClient(host, port, fetchResource)
+
+        val client = Client(name, updateInputChannel, serverPostChannel, fetchClient)
         val webSocketClient = WebSocketClient(host, wsPort, updateInputChannel, serverPostChannel)
 
         client.start()
@@ -38,13 +47,8 @@ class DevClientMain : CliktCommand() {
             while (true) {
                 val message = readLine() ?: return@launch
                 if (message.equals("exit", true)) return@launch
-                val newId = try {
-                    message.toLong()
-                } catch (e: Exception) {
-                    println("Enter a number!")
-                    continue
-                }
-                val updateDescriptor = UpdateDescriptor(name, newId, null)
+                val newId = if (message == "reject") "" else uidGenerator.generate(5)
+                val updateDescriptor = UpdateDescriptor(name, "", newId, UpdateStatus.LOCAL)
                 updateInputScope.launch {
                     updateInputChannel.send(updateDescriptor)
                 }

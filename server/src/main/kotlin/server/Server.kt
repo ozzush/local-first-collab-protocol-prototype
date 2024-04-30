@@ -1,9 +1,6 @@
 package server
 
-import common.ClientUpdate
-import common.LogModel
-import common.ServerResponse
-import common.UpdateDescriptor
+import common.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.channels.ReceiveChannel
@@ -13,8 +10,8 @@ import java.util.concurrent.Executors
 import java.util.logging.Logger
 
 class Server(
-    private val updateInputChannel: ReceiveChannel<ClientUpdate>,
-    private val serverResponseChannel: SendChannel<ServerResponse>
+    private val updateInputChannel: ReceiveChannel<UpdateDescriptor>,
+    private val serverResponseChannel: SendChannel<UpdateDescriptor>
 ) {
     private val updateInputScope = CoroutineScope(
         Executors.newSingleThreadExecutor().asCoroutineDispatcher()
@@ -23,7 +20,7 @@ class Server(
         Executors.newSingleThreadExecutor().asCoroutineDispatcher()
     )
 
-    val log = LogModel()
+    val log = LogModel().apply { add(UpdateDescriptor("server", "", "init", UpdateStatus.COMMIT)) }
 
     fun start() {
         updateInputScope.launch {
@@ -36,34 +33,22 @@ class Server(
         }
     }
 
-    private fun processUpdate(update: ClientUpdate): ServerResponse {
+    private fun processUpdate(update: UpdateDescriptor): UpdateDescriptor {
         LOG.info("Next update: $update")
-        val base = baseTxnId()
-        val shouldCommitUpdate = shouldCommit(update)
-        val newTxnId = if (shouldCommitUpdate) base + 1 else -1L
-        if (shouldCommitUpdate) {
-            log.add(UpdateDescriptor(update.author, update.newTxnId, newTxnId))
+        val base = baseId()
+        val status = if (shouldCommit(update)) UpdateStatus.COMMIT else UpdateStatus.REJECT
+        val processedUpdate = update.copy(status = status)
+        if (status == UpdateStatus.COMMIT) {
+            log.add(processedUpdate)
         }
-        return ServerResponse(
-            update.author, base, update.newTxnId, newTxnId
-        )
+        return processedUpdate
     }
 
-    private fun shouldCommit(update: ClientUpdate): Boolean {
-        if (update.basedOnLocal) {
-            val lastCommitByAuthor = log.lastFromAuthor(update.author)
-            if (lastCommitByAuthor == null || lastCommitByAuthor.initialId != update.baseTxnId) {
-                LOG.info("Update from client ${update.author} is based on his " +
-                         "local update ${update.baseTxnId} " +
-                         "but the previous commit from this client " +
-                         "is numbered ${lastCommitByAuthor?.initialId}")
-                return false
-            }
-        }
-        return update.newTxnId != 0L
+    private fun shouldCommit(update: UpdateDescriptor): Boolean {
+        return update.baseId == baseId() && update.id != ""
     }
 
-    private fun baseTxnId() = log.last().assignedId!!
+    private fun baseId() = log.last().id
 }
 
 private val LOG = Logger.getLogger("Server")

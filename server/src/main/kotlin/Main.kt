@@ -2,10 +2,9 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.int
+import common.UpdateDescriptor
 import kotlinx.coroutines.channels.Channel
 import java.util.logging.Logger
-import common.ClientUpdate
-import common.ServerResponse
 import server.HttpServer
 import server.Server
 import server.WebSocketServer
@@ -19,10 +18,11 @@ class DevServerMain : CliktCommand() {
         .default(9001)
 
     override fun run() {
+        LOG.info("Starting HttpServer on port $port")
         LOG.info("Starting WebSocketServer on port $wsPort")
 
-        val updateInputChannel = Channel<ClientUpdate>()
-        val serverResponseChannel = Channel<ServerResponse>()
+        val updateInputChannel = Channel<UpdateDescriptor>()
+        val serverResponseChannel = Channel<UpdateDescriptor>()
         val server = Server(updateInputChannel, serverResponseChannel)
         val httpServer = HttpServer(port, server)
         val webSocketServer = WebSocketServer(wsPort, updateInputChannel, serverResponseChannel)

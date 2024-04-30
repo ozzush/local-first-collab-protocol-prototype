@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class LogModel(
-    private val log: MutableList<UpdateDescriptor> = mutableListOf(UpdateDescriptor("server", 0, 1))
+    private val log: MutableList<UpdateDescriptor> = mutableListOf()
 ) {
     fun add(updateDescriptor: UpdateDescriptor) {
         log.add(updateDescriptor)
