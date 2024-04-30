@@ -6,32 +6,33 @@ import common.ServerResponse
 import common.UpdateDescriptor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.asCoroutineDispatcher
-import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.launch
-import kotlinx.serialization.Serializable
 import java.util.concurrent.Executors
 import java.util.logging.Logger
 
 class Server(
-    private val updateInputChannel: Channel<ClientUpdate>,
-    private val serverResponseChannel: Channel<ServerResponse>
+    private val updateInputChannel: ReceiveChannel<ClientUpdate>,
+    private val serverResponseChannel: SendChannel<ServerResponse>
 ) {
-    private val wsCommunicationScope = CoroutineScope(
+    private val updateInputScope = CoroutineScope(
+        Executors.newSingleThreadExecutor().asCoroutineDispatcher()
+    )
+    private val serverResponseScope = CoroutineScope(
         Executors.newSingleThreadExecutor().asCoroutineDispatcher()
     )
 
-    private val log = LogModel()
+    val log = LogModel()
 
-    init {
-        wsCommunicationScope.launch {
-            processUpdatesLoop()
-        }
-    }
-
-    private suspend fun processUpdatesLoop() {
-        for (update in updateInputChannel) {
-            val response = processUpdate(update)
-            serverResponseChannel.send(response)
+    fun start() {
+        updateInputScope.launch {
+            for (update in updateInputChannel) {
+                val response = processUpdate(update)
+                serverResponseScope.launch {
+                    serverResponseChannel.send(response)
+                }
+            }
         }
     }
 

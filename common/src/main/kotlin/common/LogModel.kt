@@ -1,13 +1,11 @@
 package common
 
-class LogModel {
-    private val log = mutableListOf(UpdateDescriptor("server", 0, 1))
+import kotlinx.serialization.Serializable
 
-    fun deepCopy() = LogModel().also {
-        it.log.clear()
-        it += log
-    }
-
+@Serializable
+data class LogModel(
+    private val log: MutableList<UpdateDescriptor> = mutableListOf(UpdateDescriptor("server", 0, 1))
+) {
     fun add(updateDescriptor: UpdateDescriptor) {
         log.add(updateDescriptor)
     }

@@ -6,25 +6,29 @@ import kotlinx.coroutines.channels.Channel
 import java.util.logging.Logger
 import common.ClientUpdate
 import common.ServerResponse
+import server.HttpServer
 import server.Server
 import server.WebSocketServer
 
 fun main(args: Array<String>) = DevServerMain().main(args)
 
 class DevServerMain : CliktCommand() {
+    private val port by option("--port", help = "HTTP Port to listen on").int()
+        .default(9000)
     private val wsPort by option("--ws-port", help = "WebSocket port to listen on").int()
         .default(9001)
-
-    private lateinit var server: Server
 
     override fun run() {
         LOG.info("Starting WebSocketServer on port $wsPort")
 
         val updateInputChannel = Channel<ClientUpdate>()
         val serverResponseChannel = Channel<ServerResponse>()
-        server = Server(updateInputChannel, serverResponseChannel)
+        val server = Server(updateInputChannel, serverResponseChannel)
+        val httpServer = HttpServer(port, server)
         val webSocketServer = WebSocketServer(wsPort, updateInputChannel, serverResponseChannel)
+        server.start()
         webSocketServer.start(0, false)
+        httpServer.start()
     }
 }
 

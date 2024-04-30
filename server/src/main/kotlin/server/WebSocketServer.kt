@@ -6,6 +6,8 @@ import kotlinx.coroutines.channels.Channel
 import fi.iki.elonen.NanoWSD
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.launch
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -16,8 +18,8 @@ import java.util.logging.Logger
 
 class WebSocketServer(
     port: Int,
-    private val updateInputChannel: Channel<ClientUpdate>,
-    private val serverResponseChannel: Channel<ServerResponse>
+    private val updateInputChannel: SendChannel<ClientUpdate>,
+    private val serverResponseChannel: ReceiveChannel<ServerResponse>
 ) :
     NanoWSD("localhost", port) {
     private val wsResponseScope = CoroutineScope(
