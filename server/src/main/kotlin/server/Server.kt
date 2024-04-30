@@ -35,7 +35,6 @@ class Server(
 
     private fun processUpdate(update: UpdateDescriptor): UpdateDescriptor {
         LOG.info("Next update: $update")
-        val base = baseId()
         val status = if (shouldCommit(update)) UpdateStatus.COMMIT else UpdateStatus.REJECT
         val processedUpdate = update.copy(status = status)
         if (status == UpdateStatus.COMMIT) {

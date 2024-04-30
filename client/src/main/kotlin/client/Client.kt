@@ -80,9 +80,13 @@ class Client(
                     fetchAndLoadNewLog()
                 }
             }
-            // The server rejected this client's update. The client should discard its local state and
-            // fetch relevant state from the server
-            UpdateStatus.REJECT -> fetchAndLoadNewLog()
+            // The server rejected this client's update.
+            // The client should discard its local state and fetch project state from the server
+            UpdateStatus.REJECT -> {
+                // TODO: INITIATE SYNCHRONIZATION PHASE AND SENDING ALL UNCOMMITTED UPDATES
+                // TODO: TO THE SERVER
+                fetchAndLoadNewLog()
+            }
         }
     }
 
