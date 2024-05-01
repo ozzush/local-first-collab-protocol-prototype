@@ -1,17 +1,17 @@
 package server
 
-import common.BulkSendChannel
 import common.SynchronizeResponse
 import common.UpdateDescriptor
 import fi.iki.elonen.NanoHTTPD
 import fi.iki.elonen.NanoHTTPD.Response.Status
+import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.util.logging.Logger
 
-class HttpServer(port: Int, private val server: Server, private val serverResponseChannel: BulkSendChannel<UpdateDescriptor>) : NanoHTTPD("localhost", port) {
+class HttpServer(port: Int, private val server: Server, private val serverResponseChannel: SendChannel<UpdateDescriptor>) : NanoHTTPD("localhost", port) {
     override fun serve(session: IHTTPSession): Response {
         LOG.info(session.uri)
         return when (session.uri) {
@@ -27,9 +27,6 @@ class HttpServer(port: Int, private val server: Server, private val serverRespon
                 val processedUpdates = server.synchronize(updates)
                 val syncResponse = SynchronizeResponse(server.database, processedUpdates != null)
                 val responseJson = Json.encodeToString(syncResponse)
-                if (processedUpdates != null) {
-                    runBlocking { serverResponseChannel.sendBulk (processedUpdates) }
-                }
                 newFixedLengthResponse(Status.OK, "application/json", responseJson)
             }
 

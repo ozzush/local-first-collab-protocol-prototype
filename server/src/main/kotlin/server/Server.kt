@@ -6,6 +6,7 @@ import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import java.util.concurrent.Executors
 import java.util.logging.Logger
 
@@ -16,35 +17,32 @@ class Server(
     private val updateInputScope = CoroutineScope(
         Executors.newSingleThreadExecutor().asCoroutineDispatcher()
     )
-    private val serverResponseScope = CoroutineScope(
-        Executors.newSingleThreadExecutor().asCoroutineDispatcher()
-    )
 
     val database = DatabaseMock().apply { apply(UpdateDescriptor("server", "", "init", UpdateStatus.COMMIT)) }
 
     fun start() {
         updateInputScope.launch {
             for (update in updateInputChannel) {
-                val response = processUpdate(update)
-                serverResponseScope.launch {
-                    serverResponseChannel.send(response)
+                LOG.info("Next update: $update")
+                if (shouldCommit(update)) {
+                    commit(update)
+                } else {
+                    reject(update)
                 }
             }
-        }
-    }
-
-    private fun processUpdate(update: UpdateDescriptor): UpdateDescriptor {
-        LOG.info("Next update: $update")
-        return if (shouldCommit(update)) {
-            commit(update)
-        } else {
-            update.copy(status = UpdateStatus.REJECT)
         }
     }
 
     private fun commit(update: UpdateDescriptor): UpdateDescriptor {
         val processedUpdate = update.copy(status = UpdateStatus.COMMIT)
         database.apply(processedUpdate)
+        runBlocking { serverResponseChannel.send(processedUpdate) }
+        return processedUpdate
+    }
+
+    private fun reject(update: UpdateDescriptor): UpdateDescriptor {
+        val processedUpdate = update.copy(status = UpdateStatus.REJECT)
+        runBlocking { serverResponseChannel.send(processedUpdate) }
         return processedUpdate
     }
 
@@ -66,7 +64,7 @@ class Server(
     }
 
     private fun shouldCommit(update: UpdateDescriptor): Boolean {
-        return update.baseId == baseId() && update.id != ""
+        return update.baseId == baseId() && !update.id.startsWith("-")
     }
 
     private fun baseId() = database.lastUpdate().id

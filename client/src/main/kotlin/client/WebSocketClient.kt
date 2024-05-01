@@ -30,9 +30,6 @@ class WebSocketClient(
     private val outerScope = CoroutineScope(
         Executors.newSingleThreadExecutor().asCoroutineDispatcher()
     )
-    private val updateInputScope = CoroutineScope(
-        Executors.newSingleThreadExecutor().asCoroutineDispatcher()
-    )
 
     private val httpClient: HttpClient = HttpClient {
         install(WebSockets)
@@ -47,7 +44,9 @@ class WebSocketClient(
                     LOG.info("Accepting server responses")
                     for (message in incoming) {
                         message as? Frame.Text ?: continue
-                        receiveServerResponse(message.readText())
+                        val update = Json.decodeFromString<UpdateDescriptor>(message.readText())
+                        LOG.info("Server response: $update")
+                        updateInputChannel.send(update)
                     }
                 }
                 val job2 = serverPostScope.launch {
@@ -67,14 +66,6 @@ class WebSocketClient(
             currentJob?.cancelAndJoin()
         }
         httpClient.close()
-    }
-
-    private fun receiveServerResponse(text: String) {
-        val update = Json.decodeFromString<UpdateDescriptor>(text)
-        LOG.info("Server response: $update")
-        updateInputScope.launch {
-            updateInputChannel.send(update)
-        }
     }
 }
 

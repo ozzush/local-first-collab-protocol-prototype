@@ -24,9 +24,9 @@ class DevServerMain : CliktCommand() {
 
         val updateInputChannel = Channel<UpdateDescriptor>()
         val serverResponseChannel = Channel<UpdateDescriptor>()
-        val bulkSendServerResponseChannel = BulkSendChannel(serverResponseChannel)
-        val server = Server(updateInputChannel, bulkSendServerResponseChannel)
-        val httpServer = HttpServer(port, server, bulkSendServerResponseChannel)
+//        val bulkSendServerResponseChannel = BulkSendChannel(serverResponseChannel)
+        val server = Server(updateInputChannel, serverResponseChannel)
+        val httpServer = HttpServer(port, server, serverResponseChannel)
         val webSocketServer = WebSocketServer(wsPort, updateInputChannel, serverResponseChannel)
         server.start()
         webSocketServer.start(0, false)

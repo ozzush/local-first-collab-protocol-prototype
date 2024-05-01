@@ -49,11 +49,10 @@ class DevClientMain : CliktCommand() {
             while (true) {
                 val message = readLine() ?: return@launch
                 if (message.equals("exit", true)) return@launch
-                val newId = if (message == "reject") "" else uidGenerator.generate(5)
-                val updateDescriptor = UpdateDescriptor(name, "", newId, UpdateStatus.LOCAL)
-                updateInputScope.launch {
-                    updateInputChannel.send(updateDescriptor)
-                }
+                val newId = uidGenerator.generate(5)
+                val idWithReject = if (message == "reject") "-$newId" else newId
+                val updateDescriptor = UpdateDescriptor(name, "", idWithReject, UpdateStatus.LOCAL)
+                updateInputChannel.send(updateDescriptor)
             }
         }
 

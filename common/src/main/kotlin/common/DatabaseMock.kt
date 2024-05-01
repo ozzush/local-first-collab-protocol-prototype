@@ -10,10 +10,6 @@ data class DatabaseMock(
         history.add(updateDescriptor)
     }
 
-    fun applyAll(updates: List<UpdateDescriptor>) {
-        history += updates
-    }
-
     fun lastUpdate() = history.last()
 
     fun data() = history.toList()
