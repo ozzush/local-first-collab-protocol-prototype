@@ -20,7 +20,7 @@ class Server(
         Executors.newSingleThreadExecutor().asCoroutineDispatcher()
     )
 
-    val log = LogModel().apply { add(UpdateDescriptor("server", "", "init", UpdateStatus.COMMIT)) }
+    val database = DatabaseMock().apply { apply(UpdateDescriptor("server", "", "init", UpdateStatus.COMMIT)) }
 
     fun start() {
         updateInputScope.launch {
@@ -38,7 +38,7 @@ class Server(
         val status = if (shouldCommit(update)) UpdateStatus.COMMIT else UpdateStatus.REJECT
         val processedUpdate = update.copy(status = status)
         if (status == UpdateStatus.COMMIT) {
-            log.add(processedUpdate)
+            database.apply(processedUpdate)
         }
         return processedUpdate
     }
@@ -47,7 +47,7 @@ class Server(
         return update.baseId == baseId() && update.id != ""
     }
 
-    private fun baseId() = log.last().id
+    private fun baseId() = database.lastUpdate().id
 }
 
 private val LOG = Logger.getLogger("Server")

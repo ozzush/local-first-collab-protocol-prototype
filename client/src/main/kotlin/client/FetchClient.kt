@@ -1,6 +1,6 @@
 package client
 
-import common.LogModel
+import common.DatabaseMock
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.websocket.*
@@ -21,7 +21,7 @@ class FetchClient(
         install(WebSockets)
     }
 
-    fun fetch(): LogModel {
+    fun fetch(): DatabaseMock {
         val uri = "http://$host:$port/$resource"
         LOG.info("Fetching project from $uri")
         val response = runBlocking { httpClient.get(uri) }
