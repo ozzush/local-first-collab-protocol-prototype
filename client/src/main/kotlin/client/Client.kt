@@ -1,6 +1,6 @@
 package client
 
-import common.LogModel
+import common.DatabaseMock
 import common.UpdateDescriptor
 import common.UpdateStatus
 import kotlinx.coroutines.*
@@ -23,28 +23,28 @@ class Client(
 
     private val unconfirmedUpdates = mutableListOf<UpdateDescriptor>()
 
-    private var log = LogModel()
+    private var database = DatabaseMock()
 
     private var currentJob: Job? = null
 
-    private fun loadLog(newLog: LogModel) {
-        log = newLog
+    private fun loadDatabase(newDatabase: DatabaseMock) {
+        database = newDatabase
         unconfirmedUpdates.clear()
     }
 
-    private fun fetchAndLoadNewLog() {
-        val newLog = client.fetch()
-        loadLog(newLog)
+    private fun fetchAndLoadNewDatabase() {
+        val newDatabase = client.fetch()
+        loadDatabase(newDatabase)
     }
 
     fun start() {
-        loadLog(client.fetch())
-        println("Current log: ${log.data()}")
+        loadDatabase(client.fetch())
+        println("Current log: ${database.data()}")
         currentJob = eventLoopScope.launch {
             LOG.info("Processing updates")
             for (update in updateInputChannel) {
                 processUpdate(update)
-                println("Current log: ${log.data()}")
+                println("Current log: ${database.data()}")
             }
         }
     }
@@ -63,7 +63,7 @@ class Client(
         when (update.status) {
             UpdateStatus.LOCAL -> {
                 val realUpdate = update.copy(baseId = baseId())
-                log.add(realUpdate)
+                database.apply(realUpdate)
                 unconfirmedUpdates.add(realUpdate)
                 channelScope.launch {
                     serverChannel.send(realUpdate)
@@ -73,11 +73,11 @@ class Client(
                 if (update.author == name) {
                     unconfirmedUpdates.removeAt(0)
                 } else if (update.baseId == baseId()) {
-                    log.add(update)
+                    database.apply(update)
                 } else {
                     // The client diverged from the server and needs to fetch the latest
                     // version of the project
-                    fetchAndLoadNewLog()
+                    fetchAndLoadNewDatabase()
                 }
             }
             // The server rejected this client's update.
@@ -85,12 +85,12 @@ class Client(
             UpdateStatus.REJECT -> {
                 // TODO: INITIATE SYNCHRONIZATION PHASE AND SENDING ALL UNCOMMITTED UPDATES
                 // TODO: TO THE SERVER
-                fetchAndLoadNewLog()
+                fetchAndLoadNewDatabase()
             }
         }
     }
 
-    private fun baseId() = log.last().id
+    private fun baseId() = database.lastUpdate().id
 }
 
 

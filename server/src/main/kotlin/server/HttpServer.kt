@@ -11,7 +11,7 @@ class HttpServer(port: Int, private val server: Server) : NanoHTTPD("localhost",
         LOG.info(session.uri)
         return when (session.uri) {
             "/fetch" -> {
-                val log = server.log
+                val log = server.database
                 val logString = Json.encodeToString(log)
                 newFixedLengthResponse(Status.OK, "application/json", logString)
             }
