@@ -14,3 +14,9 @@ data class UpdateDescriptor(
     val id: String,
     val status: UpdateStatus
 )
+
+@Serializable
+data class SynchronizeResponse(
+    val database: DatabaseMock,
+    val updatesCommitted: Boolean
+)

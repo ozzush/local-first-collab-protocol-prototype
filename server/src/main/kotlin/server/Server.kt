@@ -35,12 +35,34 @@ class Server(
 
     private fun processUpdate(update: UpdateDescriptor): UpdateDescriptor {
         LOG.info("Next update: $update")
-        val status = if (shouldCommit(update)) UpdateStatus.COMMIT else UpdateStatus.REJECT
-        val processedUpdate = update.copy(status = status)
-        if (status == UpdateStatus.COMMIT) {
-            database.apply(processedUpdate)
+        return if (shouldCommit(update)) {
+            commit(update)
+        } else {
+            update.copy(status = UpdateStatus.REJECT)
         }
+    }
+
+    private fun commit(update: UpdateDescriptor): UpdateDescriptor {
+        val processedUpdate = update.copy(status = UpdateStatus.COMMIT)
+        database.apply(processedUpdate)
         return processedUpdate
+    }
+
+    fun synchronize(updates: List<UpdateDescriptor>): List<UpdateDescriptor>? {
+        if (updates.isEmpty()) return null
+        return if (shouldCommit(updates)) {
+            val firstUpdate = updates.first().copy(baseId = baseId())
+            val modifiedUpdates = listOf(firstUpdate) + updates.slice(1 until updates.size)
+            modifiedUpdates.map { update -> commit(update) }
+        } else null
+    }
+
+    private fun shouldCommit(updates: List<UpdateDescriptor>): Boolean {
+        if (updates.any { it.id.startsWith("-") }) return false
+        for (i in updates.indices) {
+            if (updates[i + 1].baseId != updates[i].id) return false
+        }
+        return true
     }
 
     private fun shouldCommit(update: UpdateDescriptor): Boolean {

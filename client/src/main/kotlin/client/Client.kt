@@ -12,7 +12,7 @@ class Client(
     private val name: String,
     private val updateInputChannel: Channel<UpdateDescriptor>,
     private val serverChannel: Channel<UpdateDescriptor>,
-    private val client: FetchClient
+    private val client: HTTPClient
 ) {
     private val eventLoopScope = CoroutineScope(
         Executors.newSingleThreadExecutor().asCoroutineDispatcher()
@@ -24,6 +24,9 @@ class Client(
     private val unconfirmedUpdates = mutableListOf<UpdateDescriptor>()
 
     private var database = DatabaseMock()
+
+    private val appliedUpdates
+        get() = database.data().map { it.id }.toSet()
 
     private var currentJob: Job? = null
 
@@ -60,6 +63,8 @@ class Client(
         // Although ideally such messages shouldn't be sent by the server at all
         if (update.author != name && update.status == UpdateStatus.REJECT) return
 
+        if (update.id !in appliedUpdates) return
+
         when (update.status) {
             UpdateStatus.LOCAL -> {
                 val realUpdate = update.copy(baseId = baseId())
@@ -71,6 +76,7 @@ class Client(
             }
             UpdateStatus.COMMIT -> {
                 if (update.author == name) {
+                    check(update.id == unconfirmedUpdates[0].id)
                     unconfirmedUpdates.removeAt(0)
                 } else if (update.baseId == baseId()) {
                     database.apply(update)
@@ -83,9 +89,12 @@ class Client(
             // The server rejected this client's update.
             // The client should discard its local state and fetch project state from the server
             UpdateStatus.REJECT -> {
-                // TODO: INITIATE SYNCHRONIZATION PHASE AND SENDING ALL UNCOMMITTED UPDATES
-                // TODO: TO THE SERVER
-                fetchAndLoadNewDatabase()
+                if (unconfirmedUpdates.isNotEmpty()) {
+                    val response = client.synchronize(unconfirmedUpdates)
+                    unconfirmedUpdates.clear()
+                    loadDatabase(response.database)
+                    // TODO: Do something if the updates where not committed
+                }
             }
         }
     }

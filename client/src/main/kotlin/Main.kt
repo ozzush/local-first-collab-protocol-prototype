@@ -23,6 +23,8 @@ class DevClientMain : CliktCommand() {
     private val host by option("--host", help = "Address of the server").default("localhost")
     private val fetchResource by option("--fetch-resource", help = "HTTP resource to fetch the most recent version of the project from")
         .default("fetch")
+    private val syncResource by option("--sync-resource", help = "HTTP resource to use for project synchronization")
+        .default("synchronize")
     private val seed by option("--seed", help = "Seed for the random string generator. Defaults to the name's hash").long()
 
     override fun run() {
@@ -36,7 +38,7 @@ class DevClientMain : CliktCommand() {
             Executors.newSingleThreadExecutor().asCoroutineDispatcher()
         )
 
-        val fetchClient = FetchClient(host, port, fetchResource)
+        val fetchClient = HTTPClient(host, port, fetchResource, syncResource)
 
         val client = Client(name, updateInputChannel, serverPostChannel, fetchClient)
         val webSocketClient = WebSocketClient(host, wsPort, updateInputChannel, serverPostChannel)
