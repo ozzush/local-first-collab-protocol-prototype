@@ -18,7 +18,7 @@ class Server(
         Executors.newSingleThreadExecutor().asCoroutineDispatcher()
     )
 
-    val database = DatabaseMock().apply { apply(UpdateDescriptor("server", "", "init", UpdateStatus.COMMIT)) }
+    val database = DatabaseMock().apply { apply(UpdateDescriptor("server", "", "init", UpdateStatus.COMMIT, "")) }
 
     fun start() {
         updateInputScope.launch {
