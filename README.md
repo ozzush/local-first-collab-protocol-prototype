@@ -6,8 +6,8 @@ it is committed or not. In this example the server commits all updates
 that have matching baseId and non-empty id.
 
 When a client is started, he connects to the server. After that he accepts input, 
-each line of input triggering an update. Inputting "reject" generates an update with empty id,
-which makes the server automatically reject it.
+each line of input triggering an update. Inputting "reject" or "r" generates an update with 
+an id that starts with "-", which makes the server automatically reject it.
 
 
 # Ad-hoc testing the protocol
@@ -24,20 +24,6 @@ which makes the server automatically reject it.
     ./gradlew :client:run --args="--name dmitry" --console=plain
     ```
 
-2. Cut off connection between the clients and the server
-
-    ```bash
-    sudo iptables -A OUTPUT -p tcp --dport 9001 -j DROP
-    ```
-
-3. Trigger a couple of updates on each of the client by inputting unique numbers. Uniqueness only
-matters in the context of a single client. For example, you can input 5 and 6 on
-both clients.
-
-4. Restore connection to the server
-
-    ```bash
-    sudo iptables -F OUTPUT
-    ```
-
-    After a few seconds both clients should print a consistent log.
+2. Trigger a couple of updates on each of the client by entering a newline. By default, the client
+is set to wait 3 seconds before sending the update info to the server. Due to that two clients will
+diverge if updates on both of them are triggered in the span of 3 seconds.
