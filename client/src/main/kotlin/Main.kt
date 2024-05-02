@@ -5,12 +5,14 @@ import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.int
 import com.github.ajalt.clikt.parameters.types.long
+import com.github.ajalt.clikt.parameters.types.uint
 import common.RandomStringGenerator
 import common.UpdateDescriptor
 import common.UpdateStatus
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import java.util.concurrent.Executors
+import kotlin.time.Duration.Companion.seconds
 
 fun main(args: Array<String>) = DevClientMain().main(args)
 
@@ -26,14 +28,13 @@ class DevClientMain : CliktCommand() {
     private val syncResource by option("--sync-resource", help = "HTTP resource to use for project synchronization")
         .default("synchronize")
     private val seed by option("--seed", help = "Seed for the random string generator. Defaults to the name's hash").long()
+    private val sendingDelay by option("--sending-delay", help = "Amount of seconds to wait before sending update to the server").long()
+        .default(3)
 
     override fun run() {
         val uidGenerator = RandomStringGenerator(seed ?: name.hashCode().toLong())
         val updateInputChannel = Channel<UpdateDescriptor>()
         val serverPostChannel = Channel<UpdateDescriptor>()
-        val updateInputScope = CoroutineScope(
-            Executors.newSingleThreadExecutor().asCoroutineDispatcher()
-        )
         val clientInputScope = CoroutineScope(
             Executors.newSingleThreadExecutor().asCoroutineDispatcher()
         )
@@ -41,7 +42,7 @@ class DevClientMain : CliktCommand() {
         val fetchClient = HTTPClient(host, port, fetchResource, syncResource)
 
         val client = Client(name, updateInputChannel, serverPostChannel, fetchClient)
-        val webSocketClient = WebSocketClient(host, wsPort, updateInputChannel, serverPostChannel)
+        val webSocketClient = WebSocketClient(host, wsPort, updateInputChannel, serverPostChannel, sendingDelay.seconds)
 
         client.start()
         webSocketClient.start()
@@ -50,7 +51,7 @@ class DevClientMain : CliktCommand() {
                 val message = readLine() ?: return@launch
                 if (message.equals("exit", true)) return@launch
                 val newId = uidGenerator.generate(5)
-                val idWithReject = if (message == "reject") "-$newId" else newId
+                val idWithReject = if (message == "reject" || message == "r") "-$newId" else newId
                 val updateDescriptor = UpdateDescriptor(name, "", idWithReject, UpdateStatus.LOCAL)
                 updateInputChannel.send(updateDescriptor)
             }

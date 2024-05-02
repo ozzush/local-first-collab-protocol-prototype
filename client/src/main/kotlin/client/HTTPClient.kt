@@ -13,6 +13,7 @@ import kotlinx.coroutines.*
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import java.lang.Exception
 import java.util.logging.Logger
 
 class HTTPClient(
@@ -39,10 +40,13 @@ class HTTPClient(
     fun synchronize(updates: List<UpdateDescriptor>): SynchronizeResponse {
         val uri = "http://$host:$port/$synchronizeResource"
         LOG.info("Synchronizing project using $uri")
+        val updatesJson = Json.encodeToString(updates)
         val response = runBlocking {
-            httpClient.post {
-                url { path(uri) }
-                setBody(updates)
+            httpClient.post (uri)
+            {
+//                url { path(uri) }
+                setBody(updatesJson)
+                contentType(ContentType.Application.Json)
             }
         }
         val responseStr = runBlocking { response.bodyAsText() }

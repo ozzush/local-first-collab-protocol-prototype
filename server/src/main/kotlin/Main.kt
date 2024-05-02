@@ -2,7 +2,6 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.int
-import common.BulkSendChannel
 import common.UpdateDescriptor
 import kotlinx.coroutines.channels.Channel
 import java.util.logging.Logger
@@ -24,9 +23,8 @@ class DevServerMain : CliktCommand() {
 
         val updateInputChannel = Channel<UpdateDescriptor>()
         val serverResponseChannel = Channel<UpdateDescriptor>()
-//        val bulkSendServerResponseChannel = BulkSendChannel(serverResponseChannel)
         val server = Server(updateInputChannel, serverResponseChannel)
-        val httpServer = HttpServer(port, server, serverResponseChannel)
+        val httpServer = HttpServer(port, server)
         val webSocketServer = WebSocketServer(wsPort, updateInputChannel, serverResponseChannel)
         server.start()
         webSocketServer.start(0, false)

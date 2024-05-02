@@ -1,6 +1,7 @@
 package client
 
 import common.DatabaseMock
+import common.SynchronizeResponse
 import common.UpdateDescriptor
 import common.UpdateStatus
 import kotlinx.coroutines.*
@@ -74,36 +75,52 @@ class Client(
                 val realUpdate = update.copy(baseId = baseId())
                 database.apply(realUpdate)
                 unconfirmedUpdates.add(realUpdate)
-                runBlocking { serverChannel.send (realUpdate) }
+                runBlocking { serverChannel.send(realUpdate) }
             }
+
             UpdateStatus.COMMIT -> {
                 if (update.author == name) {
                     LOG.info("...confirmation from server")
-                    check(update.id == unconfirmedUpdates[0].id)
-                    unconfirmedUpdates.removeAt(0)
+                    if (update.id == unconfirmedUpdates.getOrNull(0)?.id) {
+                        LOG.info("...confirmed ${update.id}")
+                        unconfirmedUpdates.removeAt(0)
+                    } else {
+                        LOG.info("...ignoring, id ${update.id} doesn't match last unconfirmed update id " +
+                                 "${unconfirmedUpdates.getOrNull(0)?.id}")
+                    }
                 } else if (update.baseId == baseId()) {
                     LOG.info("...applying")
                     database.apply(update)
                 } else if (update.id !in appliedUpdates) {
                     LOG.info("...can't apply")
-                    // The client diverged from the server and needs to fetch the latest
-                    // version of the project
-                    fetchAndLoadNewDatabase()
+                    // The client diverged from the server and needs to synchronize
+                    synchronize()
                 } else {
                     LOG.info("...already applied")
                 }
             }
             // The server rejected this client's update.
-            // The client should discard its local state and fetch project state from the server
+            // The client should synchronize with the server
             UpdateStatus.REJECT -> {
-                if (unconfirmedUpdates.isNotEmpty()) {
-                    LOG.info("...synchronizing")
-                    val response = client.synchronize(unconfirmedUpdates)
-                    unconfirmedUpdates.clear()
-                    loadDatabase(response.database)
-                    // TODO: Do something if the updates where not committed
-                }
+                LOG.info("...update rejected")
+                synchronize()
             }
+        }
+    }
+
+    private fun synchronize(): SynchronizeResponse? {
+        LOG.info("...synchronizing")
+        LOG.info("Unconfirmed updates: $unconfirmedUpdates")
+        return if (unconfirmedUpdates.isNotEmpty()) {
+            val response = client.synchronize(unconfirmedUpdates)
+            unconfirmedUpdates.clear()
+            loadDatabase(response.database)
+            LOG.info("Synchronization response: $response")
+            response
+            // TODO: In GanttProject prompt the user to do something if the updates where not committed
+        } else {
+            fetchAndLoadNewDatabase()
+            null
         }
     }
 

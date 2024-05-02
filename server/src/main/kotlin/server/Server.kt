@@ -57,7 +57,7 @@ class Server(
 
     private fun shouldCommit(updates: List<UpdateDescriptor>): Boolean {
         if (updates.any { it.id.startsWith("-") }) return false
-        for (i in updates.indices) {
+        for (i in 0 until updates.size - 1) {
             if (updates[i + 1].baseId != updates[i].id) return false
         }
         return true

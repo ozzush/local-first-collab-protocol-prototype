@@ -11,7 +11,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.util.logging.Logger
 
-class HttpServer(port: Int, private val server: Server, private val serverResponseChannel: SendChannel<UpdateDescriptor>) : NanoHTTPD("localhost", port) {
+class HttpServer(port: Int, private val server: Server) : NanoHTTPD("localhost", port) {
     override fun serve(session: IHTTPSession): Response {
         LOG.info(session.uri)
         return when (session.uri) {
@@ -20,10 +20,17 @@ class HttpServer(port: Int, private val server: Server, private val serverRespon
                 val logString = Json.encodeToString(log)
                 newFixedLengthResponse(Status.OK, "application/json", logString)
             }
+
             "/synchronize" -> {
-                session.parseBody(mutableMapOf<String, String>())
-                val updatesStr = session.queryParameterString
-                val updates = Json.decodeFromString<List<UpdateDescriptor>>(updatesStr)
+                val files = mutableMapOf<String, String>()
+                session.parseBody(files)
+                val updatesStr = files["postData"]
+                                 ?: return newFixedLengthResponse(Status.BAD_REQUEST, MIME_PLAINTEXT, "Missing request body")
+                val updates = try {
+                    Json.decodeFromString<List<UpdateDescriptor>>(updatesStr)
+                } catch (e: Exception) {
+                    return newFixedLengthResponse(Status.BAD_REQUEST, MIME_PLAINTEXT, "Request body must be a valid json of List<UpdateDescriptor>")
+                }
                 val processedUpdates = server.synchronize(updates)
                 val syncResponse = SynchronizeResponse(server.database, processedUpdates != null)
                 val responseJson = Json.encodeToString(syncResponse)

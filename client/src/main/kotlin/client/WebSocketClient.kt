@@ -2,6 +2,7 @@ package client
 
 import common.UpdateDescriptor
 import io.ktor.client.*
+import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.websocket.*
 import io.ktor.http.*
 import io.ktor.websocket.*
@@ -13,6 +14,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.util.concurrent.Executors
 import java.util.logging.Logger
+import kotlin.time.Duration
 
 
 class WebSocketClient(
@@ -20,6 +22,7 @@ class WebSocketClient(
     private val port: Int,
     private val updateInputChannel: SendChannel<UpdateDescriptor>,
     private val serverPostChannel: ReceiveChannel<UpdateDescriptor>,
+    private val sendingDelay: Duration
 ) {
     private val serverPostScope = CoroutineScope(
         Executors.newSingleThreadExecutor().asCoroutineDispatcher()
@@ -31,7 +34,7 @@ class WebSocketClient(
         Executors.newSingleThreadExecutor().asCoroutineDispatcher()
     )
 
-    private val httpClient: HttpClient = HttpClient {
+    private val httpClient: HttpClient = HttpClient(CIO) {
         install(WebSockets)
     }
 
@@ -52,6 +55,7 @@ class WebSocketClient(
                 val job2 = serverPostScope.launch {
                     for (update in serverPostChannel) {
                         val message = Json.encodeToString(update)
+                        delay(sendingDelay)
                         LOG.info("Sending message to the server: $message")
                         send(message)
                     }
