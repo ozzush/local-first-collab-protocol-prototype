@@ -30,9 +30,7 @@ which makes the server automatically reject it.
     sudo iptables -A OUTPUT -p tcp --dport 9001 -j DROP
     ```
 
-3. Trigger a couple of updates on each of the client by inputting unique numbers. Uniqueness only
-matters in the context of a single client. For example, you can input 5 and 6 on
-both clients.
+3. Trigger a couple of updates on each of the client by entering a newline.
 
 4. Restore connection to the server
 
