@@ -1,14 +1,13 @@
 package client
 
-import common.ClientUpdate
-import common.ServerResponse
 import common.UpdateDescriptor
-import kotlinx.coroutines.channels.Channel
 import io.ktor.client.*
 import io.ktor.client.plugins.websocket.*
 import io.ktor.http.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.channels.SendChannel
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -19,8 +18,8 @@ import java.util.logging.Logger
 class WebSocketClient(
     private val host: String,
     private val port: Int,
-    private val updateInputChannel: Channel<UpdateDescriptor>,
-    private val serverPostChannel: Channel<ClientUpdate>,
+    private val updateInputChannel: SendChannel<UpdateDescriptor>,
+    private val serverPostChannel: ReceiveChannel<UpdateDescriptor>,
 ) {
     private val serverPostScope = CoroutineScope(
         Executors.newSingleThreadExecutor().asCoroutineDispatcher()
@@ -71,16 +70,10 @@ class WebSocketClient(
     }
 
     private fun receiveServerResponse(text: String) {
-        val serverResponse = Json.decodeFromString<ServerResponse>(text)
-        LOG.info("Server response: $serverResponse")
-        val updateDescriptor =
-            UpdateDescriptor(
-                serverResponse.author,
-                serverResponse.initialTxnId,
-                serverResponse.newTxnId
-            )
+        val update = Json.decodeFromString<UpdateDescriptor>(text)
+        LOG.info("Server response: $update")
         updateInputScope.launch {
-            updateInputChannel.send(updateDescriptor)
+            updateInputChannel.send(update)
         }
     }
 }

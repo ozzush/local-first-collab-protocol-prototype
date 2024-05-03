@@ -1,11 +1,12 @@
 package server
 
-import common.ClientUpdate
-import common.ServerResponse
+import common.UpdateDescriptor
 import kotlinx.coroutines.channels.Channel
 import fi.iki.elonen.NanoWSD
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.launch
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -16,8 +17,8 @@ import java.util.logging.Logger
 
 class WebSocketServer(
     port: Int,
-    private val updateInputChannel: Channel<ClientUpdate>,
-    private val serverResponseChannel: Channel<ServerResponse>
+    private val updateInputChannel: SendChannel<UpdateDescriptor>,
+    private val serverResponseChannel: ReceiveChannel<UpdateDescriptor>
 ) :
     NanoWSD("localhost", port) {
     private val wsResponseScope = CoroutineScope(
@@ -64,7 +65,7 @@ class WebSocketServer(
         }
 
         override fun onMessage(message: WebSocketFrame) {
-            val clientUpdate = Json.decodeFromString<ClientUpdate>(message.textPayload)
+            val clientUpdate = Json.decodeFromString<UpdateDescriptor>(message.textPayload)
             LOG.info("Message received: $clientUpdate")
             wsRequestScope.launch {
                 updateInputChannel.send(clientUpdate)
