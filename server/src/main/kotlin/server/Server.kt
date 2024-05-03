@@ -24,7 +24,7 @@ class Server(
         updateInputScope.launch {
             for (update in updateInputChannel) {
                 LOG.info("Next update: $update")
-                if (shouldCommit(update)) {
+                if (update.baseId == baseId) {
                     commit(update)
                 } else {
                     reject(update)
@@ -33,9 +33,24 @@ class Server(
         }
     }
 
+    private fun printDatabase() {
+        println("""Current database with last id $baseId
+            |--------------------------
+            |${database.toPrettyString()}
+            |--------------------------
+        """.trimMargin())
+    }
+
+    fun getUpdatesStartingFrom(baseId: String): List<UpdateDescriptor> {
+        val history = database.data()
+        val startIndex = history.indexOfLast { it.baseId == baseId }
+        return history.slice(startIndex until history.size)
+    }
+
     private fun commit(update: UpdateDescriptor): UpdateDescriptor {
         val processedUpdate = update.copy(status = UpdateStatus.COMMIT)
         database.apply(processedUpdate)
+        printDatabase()
         runBlocking { serverResponseChannel.send(processedUpdate) }
         return processedUpdate
     }
@@ -49,25 +64,26 @@ class Server(
     fun synchronize(updates: List<UpdateDescriptor>): List<UpdateDescriptor>? {
         if (updates.isEmpty()) return null
         return if (shouldCommit(updates)) {
-            val firstUpdate = updates.first().copy(baseId = baseId())
+            val firstUpdate = updates.first().copy(baseId = baseId)
             val modifiedUpdates = listOf(firstUpdate) + updates.slice(1 until updates.size)
             modifiedUpdates.map { update -> commit(update) }
         } else null
     }
 
     private fun shouldCommit(updates: List<UpdateDescriptor>): Boolean {
-        if (updates.any { it.id.startsWith("-") }) return false
+        if (updates.any { hasConflict(it) }) return false
         for (i in 0 until updates.size - 1) {
             if (updates[i + 1].baseId != updates[i].id) return false
         }
         return true
     }
 
-    private fun shouldCommit(update: UpdateDescriptor): Boolean {
-        return update.baseId == baseId() && update.value != "r" && update.value != "reject"
+    private fun hasConflict(update: UpdateDescriptor): Boolean {
+        return update.value == "c" || update.value == "conflict"
     }
 
-    private fun baseId() = database.lastUpdate().id
+    private val baseId
+        get() = database.lastUpdate().id
 }
 
 private val LOG = Logger.getLogger("Server")

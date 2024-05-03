@@ -1,6 +1,7 @@
 package client
 
 import common.DatabaseMock
+import common.SynchronizeRequest
 import common.SynchronizeResponse
 import common.UpdateDescriptor
 import io.ktor.client.*
@@ -37,15 +38,14 @@ class HTTPClient(
         return Json.decodeFromString(responseText)
     }
 
-    fun synchronize(updates: List<UpdateDescriptor>): SynchronizeResponse {
+    fun synchronize(updates: List<UpdateDescriptor>, lastConfirmedId: String): SynchronizeResponse {
         val uri = "http://$host:$port/$synchronizeResource"
         LOG.info("Synchronizing project using $uri")
-        val updatesJson = Json.encodeToString(updates)
+        val request = Json.encodeToString(SynchronizeRequest(updates, lastConfirmedId))
         val response = runBlocking {
             httpClient.post (uri)
             {
-//                url { path(uri) }
-                setBody(updatesJson)
+                setBody(request)
                 contentType(ContentType.Application.Json)
             }
         }

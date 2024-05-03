@@ -48,7 +48,7 @@ class WebSocketClient(
                     for (message in incoming) {
                         message as? Frame.Text ?: continue
                         val update = Json.decodeFromString<UpdateDescriptor>(message.readText())
-                        LOG.info("Server response: $update")
+//                        LOG.info("Server response: $update")
                         updateInputChannel.send(update)
                     }
                 }
