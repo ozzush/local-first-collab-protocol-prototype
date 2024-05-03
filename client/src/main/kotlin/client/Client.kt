@@ -78,30 +78,35 @@ class Client(
             UpdateStatus.LOCAL -> {
                 LOG.info("...local update")
                 val realUpdate = update.copy(baseId = baseId())
-                database.apply(realUpdate)
                 unconfirmedUpdates.add(realUpdate)
                 runBlocking { serverChannel.send(realUpdate) }
             }
 
             UpdateStatus.COMMIT -> {
-                if (update.author == name) {
-                    LOG.info("...confirmation from server")
-                    if (update.id == unconfirmedUpdates.getOrNull(0)?.id) {
-                        LOG.info("...confirmed ${update.id}")
-                        unconfirmedUpdates.removeAt(0)
+                if (update.baseId == baseId()) {
+                    if (update.author == name) {
+                        LOG.info("...confirmation from server")
+                        if (update.id == unconfirmedUpdates.firstOrNull()?.id) {
+                            LOG.info("...confirmed ${update.id}")
+                            database.apply(unconfirmedUpdates.removeFirst())
+                        } else {
+                            LOG.info(
+                                "...ignoring, id ${update.id} doesn't match last unconfirmed update id " +
+                                    "${unconfirmedUpdates.getOrNull(0)?.id}"
+                            )
+                        }
                     } else {
-                        LOG.info("...ignoring, id ${update.id} doesn't match last unconfirmed update id " +
-                                 "${unconfirmedUpdates.getOrNull(0)?.id}")
+                        LOG.info("...applying")
+                        database.apply(update)
                     }
-                } else if (update.baseId == baseId()) {
-                    LOG.info("...applying")
-                    database.apply(update)
-                } else if (update.id !in appliedUpdates) {
-                    LOG.info("...can't apply")
-                    // The client diverged from the server and needs to synchronize
-                    synchronize()
                 } else {
-                    LOG.info("...already applied")
+                    if (update.id !in appliedUpdates) {
+                        LOG.info("...can't apply")
+                        // The client diverged from the server and needs to synchronize
+                        synchronize()
+                    } else {
+                        LOG.info("...already applied")
+                    }
                 }
             }
             // The server rejected this client's update.
@@ -120,7 +125,10 @@ class Client(
             val response = client.synchronize(unconfirmedUpdates)
             unconfirmedUpdates.clear()
             loadDatabase(response.database)
-            LOG.info("Synchronization response: $response")
+            println("""Database after sync:
+                        |-----------------------------
+                        |${database.toPrettyString()}
+                    """.trimMargin())
             response
             // TODO: In GanttProject prompt the user to do something if the updates where not committed
         } else {
