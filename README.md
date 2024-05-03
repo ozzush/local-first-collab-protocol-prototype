@@ -1,13 +1,23 @@
 # Explanation
 
-Clients work on a shared log. Clients can append new entries to the log and share information
-about their local updates through a centralized server. For each update the server decides whether 
-it is committed or not. In this example the server commits all updates 
-that have matching baseId and non-empty id.
+Clients work on a database, each client has a local copy of the database. Clients can make updates 
+to the database and share information about their local updates through a centralized server. 
+Each update contains a message.
+For each update the server decides whether it is committed or not. 
+In this example the server commits all updates that have matching baseId.
 
-When a client is started, he connects to the server. After that he accepts input, 
-each line of input triggering an update. Inputting "reject" or "r" generates an update with 
-an id that starts with "-", which makes the server automatically reject it.
+When a client is started, he connects to the server. After that he accepts input,
+each line of input triggering an update. Inputting "conflict" or "c" has special meaning
+if synchronization is triggered.
+
+Sometimes a client's local database can diverge from the server's database. 
+In this case the client starts a synchronization phase.
+During synchronization phase the client sends all his unconfirmed updates to the server
+together with the id of the last committed update he observed. The server checks whether applying
+the updates would produce conflicts by checking whether 
+any update contains a "conflict" or "c" message. If there are no conflicts, updates are committed,
+ignoring the specified baseId. Finally, the server responds to the client with all the updates
+he is missing, including the updates that were just committed.
 
 
 # Ad-hoc testing the protocol
