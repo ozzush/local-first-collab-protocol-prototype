@@ -19,9 +19,6 @@ class Client(
     private val eventLoopScope = CoroutineScope(
         Executors.newSingleThreadExecutor().asCoroutineDispatcher()
     )
-    private val channelScope = CoroutineScope(
-        Executors.newSingleThreadExecutor().asCoroutineDispatcher()
-    )
 
     private val unconfirmedUpdates = mutableListOf<UpdateDescriptor>()
 
@@ -35,6 +32,15 @@ class Client(
     private fun loadDatabase(newDatabase: DatabaseMock) {
         database = newDatabase
         unconfirmedUpdates.clear()
+        printDatabase()
+    }
+
+    private fun printDatabase() {
+        println("""Current database with last id ${baseId()}
+            |--------------------------
+            |${database.toPrettyString()}
+            |--------------------------
+        """.trimMargin())
     }
 
     private fun fetchAndLoadNewDatabase() {
@@ -43,14 +49,13 @@ class Client(
     }
 
     fun start() {
-        loadDatabase(client.fetch())
-        println("Current log: ${database.data()}")
+        fetchAndLoadNewDatabase()
+
         currentJob = eventLoopScope.launch {
             LOG.info("Processing updates")
             for (update in updateInputChannel) {
                 LOG.info("Next update: $update")
                 processUpdate(update)
-                println("Current log: ${database.data()}")
             }
         }
     }

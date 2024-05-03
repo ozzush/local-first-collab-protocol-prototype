@@ -12,7 +12,8 @@ data class UpdateDescriptor(
     val author: String,
     val baseId: String,
     val id: String,
-    val status: UpdateStatus
+    val status: UpdateStatus,
+    val value: String
 )
 
 @Serializable
