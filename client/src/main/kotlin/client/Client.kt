@@ -116,6 +116,10 @@ class Client(
             unconfirmedUpdates.clear()
             loadDatabase(response.database)
             LOG.info("Synchronization response: $response")
+            println("""Database after sync:
+                        |-----------------------------
+                        |${database.toPrettyString()}
+                    """.trimMargin())
             response
             // TODO: In GanttProject prompt the user to do something if the updates where not committed
         } else {
