@@ -21,35 +21,39 @@ class Client(
     )
 
     private val unconfirmedUpdates = mutableListOf<UpdateDescriptor>()
+    private val fetchedAheadServerUpdates = mutableListOf<UpdateDescriptor>()
 
-    private var database = DatabaseMock()
-
-    private val appliedUpdates
-        get() = database.data().map { it.id }.toSet()
+    private var clientDatabase = DatabaseMock()
+    private var serverDatabase = DatabaseMock()
 
     private var currentJob: Job? = null
 
-    private fun loadDatabase(newDatabase: DatabaseMock) {
-        database = newDatabase
-        unconfirmedUpdates.clear()
-        printDatabase()
-    }
+    private val clientBaseId
+        get() = clientDatabase.lastUpdate().id
 
-    private fun printDatabase() {
-        println("""Current database with last id ${baseId()}
+    private val serverBaseId
+        get() = serverDatabase.lastUpdate().id
+
+    private fun printClientDatabase() {
+        println("""Client database with last id $clientBaseId
             |--------------------------
-            |${database.toPrettyString()}
+            |${clientDatabase.toPrettyString()}
             |--------------------------
         """.trimMargin())
     }
 
-    private fun fetchAndLoadNewDatabase() {
-        val newDatabase = client.fetch()
-        loadDatabase(newDatabase)
+    private fun printServerDatabase() {
+        println("""Server database with last id $serverBaseId
+            |--------------------------
+            |${serverDatabase.toPrettyString()}
+            |--------------------------
+        """.trimMargin())
     }
 
     fun start() {
-        fetchAndLoadNewDatabase()
+        serverDatabase = client.fetch()
+        clientDatabase = serverDatabase.deepCopy()
+        printClientDatabase()
 
         currentJob = eventLoopScope.launch {
             LOG.info("Processing updates")
@@ -66,70 +70,80 @@ class Client(
         }
     }
 
+    private fun applyToServerDatabase(update: UpdateDescriptor) {
+        if (fetchedAheadServerUpdates.isNotEmpty()) {
+            check(fetchedAheadServerUpdates.first().id == update.id)
+            fetchedAheadServerUpdates.removeFirst()
+        } else {
+            check(update.baseId == serverBaseId)
+            serverDatabase.apply(update)
+            printServerDatabase()
+        }
+    }
+
     private fun processUpdate(update: UpdateDescriptor) {
         // Discarded update from another client
         // Although ideally such messages shouldn't be sent by the server at all
         if (update.author != name && update.status == UpdateStatus.REJECT) {
-            LOG.info("...ignoring")
             return
         }
 
         when (update.status) {
             UpdateStatus.LOCAL -> {
                 LOG.info("...local update")
-                val realUpdate = update.copy(baseId = baseId())
-                database.apply(realUpdate)
+                val realUpdate = update.copy(baseId = clientBaseId)
+                clientDatabase.apply(realUpdate)
+                printClientDatabase()
                 unconfirmedUpdates.add(realUpdate)
                 runBlocking { serverChannel.send(realUpdate) }
             }
 
             UpdateStatus.COMMIT -> {
+                applyToServerDatabase(update)
+                printServerDatabase()
                 if (update.author == name) {
                     LOG.info("...confirmation from server")
                     if (update.id == unconfirmedUpdates.getOrNull(0)?.id) {
-                        LOG.info("...confirmed ${update.id}")
-                        unconfirmedUpdates.removeAt(0)
-                    } else {
-                        LOG.info("...ignoring, id ${update.id} doesn't match last unconfirmed update id " +
-                                 "${unconfirmedUpdates.getOrNull(0)?.id}")
+                        unconfirmedUpdates.removeFirst()
                     }
-                } else if (update.baseId == baseId()) {
+                } else if (update.baseId == clientBaseId) {
                     LOG.info("...applying")
-                    database.apply(update)
-                } else if (update.id !in appliedUpdates) {
+                    clientDatabase.apply(update)
+                    printClientDatabase()
+                } else {
                     LOG.info("...can't apply")
                     // The client diverged from the server and needs to synchronize
                     synchronize()
-                } else {
-                    LOG.info("...already applied")
                 }
             }
-            // The server rejected this client's update.
-            // The client should synchronize with the server
             UpdateStatus.REJECT -> {
+                // The server rejected this client's update.
+                // The server must have processed a conflicting update before
+                // receiving this update and rejecting it.
+                // The client should have already synchronized with the server
+                // when he received the conflicting update, so we don't synchronize again.
                 LOG.info("...update rejected")
-                synchronize()
             }
         }
     }
 
     private fun synchronize(): SynchronizeResponse? {
-        LOG.info("...synchronizing")
-        LOG.info("Unconfirmed updates: $unconfirmedUpdates")
         return if (unconfirmedUpdates.isNotEmpty()) {
-            val response = client.synchronize(unconfirmedUpdates)
-            unconfirmedUpdates.clear()
-            loadDatabase(response.database)
+            LOG.info("...synchronizing")
+            LOG.info("Unconfirmed updates: $unconfirmedUpdates")
+            val response = client.synchronize(unconfirmedUpdates, serverBaseId)
             LOG.info("Synchronization response: $response")
+            unconfirmedUpdates.clear()
+            serverDatabase.applyAll(response.updates)
+            fetchedAheadServerUpdates += response.updates
+            clientDatabase = serverDatabase.deepCopy()
+            printClientDatabase()
             response
             // TODO: In GanttProject prompt the user to do something if the updates where not committed
         } else {
-            fetchAndLoadNewDatabase()
             null
         }
     }
-
-    private fun baseId() = database.lastUpdate().id
 }
 
 

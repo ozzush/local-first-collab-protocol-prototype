@@ -18,6 +18,12 @@ data class UpdateDescriptor(
 
 @Serializable
 data class SynchronizeResponse(
-    val database: DatabaseMock,
+    val updates: List<UpdateDescriptor>,
     val updatesCommitted: Boolean
+)
+
+@Serializable
+data class SynchronizeRequest(
+    val updates: List<UpdateDescriptor>,
+    val lastConfirmedId: String
 )

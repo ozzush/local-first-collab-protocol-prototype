@@ -1,11 +1,9 @@
 package server
 
+import common.SynchronizeRequest
 import common.SynchronizeResponse
-import common.UpdateDescriptor
 import fi.iki.elonen.NanoHTTPD
 import fi.iki.elonen.NanoHTTPD.Response.Status
-import kotlinx.coroutines.channels.SendChannel
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -24,15 +22,17 @@ class HttpServer(port: Int, private val server: Server) : NanoHTTPD("localhost",
             "/synchronize" -> {
                 val files = mutableMapOf<String, String>()
                 session.parseBody(files)
-                val updatesStr = files["postData"]
+                val requestStr = files["postData"]
                                  ?: return newFixedLengthResponse(Status.BAD_REQUEST, MIME_PLAINTEXT, "Missing request body")
-                val updates = try {
-                    Json.decodeFromString<List<UpdateDescriptor>>(updatesStr)
+                val request = try {
+                    Json.decodeFromString<SynchronizeRequest>(requestStr)
                 } catch (e: Exception) {
                     return newFixedLengthResponse(Status.BAD_REQUEST, MIME_PLAINTEXT, "Request body must be a valid json of List<UpdateDescriptor>")
                 }
+                val updates = request.updates
                 val processedUpdates = server.synchronize(updates)
-                val syncResponse = SynchronizeResponse(server.database, processedUpdates != null)
+                val missingUpdates = server.getUpdatesStartingFrom(request.lastConfirmedId)
+                val syncResponse = SynchronizeResponse(missingUpdates, processedUpdates != null)
                 val responseJson = Json.encodeToString(syncResponse)
                 newFixedLengthResponse(Status.OK, "application/json", responseJson)
             }
