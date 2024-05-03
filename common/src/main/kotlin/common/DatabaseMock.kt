@@ -19,5 +19,5 @@ data class DatabaseMock(
 
     fun data() = history.toList()
 
-    fun toPrettyString() = history.joinToString(separator = "\n") { "#${it.baseId}(${it.author}): ${it.value}" }
+    fun toPrettyString() = history.joinToString(separator = "\n") { "#${it.baseId} -> #${it.id} (${it.author}): ${it.value}" }
 }

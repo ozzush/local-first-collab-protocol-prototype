@@ -18,7 +18,7 @@ class Server(
         Executors.newSingleThreadExecutor().asCoroutineDispatcher()
     )
 
-    val database = DatabaseMock().apply { apply(UpdateDescriptor("server", "", "init", UpdateStatus.COMMIT, "")) }
+    val database = DatabaseMock().apply { apply(UpdateDescriptor("server", "0", "init", UpdateStatus.COMMIT, "initial commit")) }
 
     fun start() {
         updateInputScope.launch {
@@ -64,7 +64,7 @@ class Server(
     }
 
     private fun shouldCommit(update: UpdateDescriptor): Boolean {
-        return update.baseId == baseId() && !update.id.startsWith("-")
+        return update.baseId == baseId() && update.value != "r" && update.value != "reject"
     }
 
     private fun baseId() = database.lastUpdate().id
