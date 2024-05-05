@@ -39,6 +39,9 @@ while ! curl -sSf http://localhost:9000/fetch > /dev/null 2>&1; do
 done
 echo "Server is up and running."
 
+# Define array to store client PIDs
+declare -a client_pids=()
+
 # Define function to start clients
 start_clients() {
   local n=$1
@@ -48,7 +51,9 @@ start_clients() {
   for ((i=0; i<$n; i++)); do
     # Generate unique client name
     client_name="Client_$i"
+    # Start client and save its PID
     ./gradlew :client:run --args="--name=$client_name --auto-update=$frequency --conflict-frac=$frac --network-delay=$delay" > /dev/null 2>&1 &
+    client_pids+=($!)
   done
 }
 
@@ -57,6 +62,11 @@ start_clients "$num_clients" "$update_frequency" "$conflict_frac" "$sending_dela
 
 # Wait for the server to stop
 wait "$server_pid"
+
+# Kill all client processes
+for pid in "${client_pids[@]}"; do
+  kill "$pid"
+done
 
 # Return server output
 cat "$file_path"
