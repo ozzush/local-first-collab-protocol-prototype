@@ -15,19 +15,23 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.lang.Exception
+import java.lang.Thread.sleep
 import java.util.logging.Logger
+import kotlin.time.Duration
 
 class HTTPClient(
     private val host: String,
     private val port: Int,
     private val fetchResource: String,
     private val synchronizeResource: String,
+    private val networkDelay: Duration
 ) {
     private val httpClient: HttpClient = HttpClient(CIO) {
         install(WebSockets)
     }
 
     fun fetch(): DatabaseMock {
+        runBlocking { delay(networkDelay) }
         val uri = "http://$host:$port/$fetchResource"
         LOG.info("Fetching project from $uri")
         val response = runBlocking { httpClient.get(uri) }
@@ -35,10 +39,12 @@ class HTTPClient(
             throw RuntimeException("Couldn't fetch the latest version of the project")
         }
         val responseText = runBlocking { response.bodyAsText() }
+        runBlocking { delay(networkDelay) }
         return Json.decodeFromString(responseText)
     }
 
     fun synchronize(updates: List<UpdateDescriptor>, lastConfirmedId: String): SynchronizeResponse {
+        runBlocking { delay(networkDelay) }
         val uri = "http://$host:$port/$synchronizeResource"
         LOG.info("Synchronizing project using $uri")
         val request = Json.encodeToString(SynchronizeRequest(updates, lastConfirmedId))
@@ -50,6 +56,7 @@ class HTTPClient(
             }
         }
         val responseStr = runBlocking { response.bodyAsText() }
+        runBlocking { delay(networkDelay) }
         return Json.decodeFromString(responseStr)
     }
 }

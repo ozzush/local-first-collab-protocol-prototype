@@ -1,12 +1,9 @@
 package server
 
 import common.*
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.SendChannel
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import java.util.concurrent.Executors
 import java.util.logging.Logger
 
@@ -14,6 +11,19 @@ class Server(
     private val updateInputChannel: ReceiveChannel<UpdateDescriptor>,
     private val serverResponseChannel: SendChannel<UpdateDescriptor>
 ) {
+    private var currentJob: Job? = null
+
+    var syncCalls = 0
+        private set
+
+    var failedSyncCalls = 0
+
+    var updatesProcessed = 0
+        private set
+
+    var rejectedUpdates = 0
+        private set
+
     private val updateInputScope = CoroutineScope(
         Executors.newSingleThreadExecutor().asCoroutineDispatcher()
     )
@@ -21,15 +31,23 @@ class Server(
     val database = DatabaseMock().apply { apply(UpdateDescriptor("server", "0", "init", UpdateStatus.COMMIT, "initial commit")) }
 
     fun start() {
-        updateInputScope.launch {
+        currentJob = updateInputScope.launch {
             for (update in updateInputChannel) {
+                ++updatesProcessed
                 LOG.info("Next update: $update")
                 if (update.baseId == baseId) {
                     commit(update)
                 } else {
+                    ++rejectedUpdates
                     reject(update)
                 }
             }
+        }
+    }
+
+    fun stop() {
+        runBlocking {
+            currentJob!!.cancelAndJoin()
         }
     }
 
@@ -43,7 +61,7 @@ class Server(
 
     fun getUpdatesStartingFrom(baseId: String): List<UpdateDescriptor> {
         val history = database.data()
-        val startIndex = history.indexOfLast { it.baseId == baseId }
+        val startIndex = history.indexOfLast { it.id == baseId } + 1
         return history.slice(startIndex until history.size)
     }
 
@@ -63,11 +81,15 @@ class Server(
 
     fun synchronize(updates: List<UpdateDescriptor>): List<UpdateDescriptor>? {
         if (updates.isEmpty()) return null
+        ++syncCalls
         return if (shouldCommit(updates)) {
             val firstUpdate = updates.first().copy(baseId = baseId)
             val modifiedUpdates = listOf(firstUpdate) + updates.slice(1 until updates.size)
             modifiedUpdates.map { update -> commit(update) }
-        } else null
+        } else {
+            ++failedSyncCalls
+            null
+        }
     }
 
     private fun shouldCommit(updates: List<UpdateDescriptor>): Boolean {

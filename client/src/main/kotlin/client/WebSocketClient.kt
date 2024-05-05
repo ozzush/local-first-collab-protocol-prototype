@@ -22,7 +22,7 @@ class WebSocketClient(
     private val port: Int,
     private val updateInputChannel: SendChannel<UpdateDescriptor>,
     private val serverPostChannel: ReceiveChannel<UpdateDescriptor>,
-    private val sendingDelay: Duration
+    private val networkDelay: Duration
 ) {
     private val serverPostScope = CoroutineScope(
         Executors.newSingleThreadExecutor().asCoroutineDispatcher()
@@ -48,14 +48,14 @@ class WebSocketClient(
                     for (message in incoming) {
                         message as? Frame.Text ?: continue
                         val update = Json.decodeFromString<UpdateDescriptor>(message.readText())
-//                        LOG.info("Server response: $update")
+                        delay(networkDelay)
                         updateInputChannel.send(update)
                     }
                 }
                 val job2 = serverPostScope.launch {
                     for (update in serverPostChannel) {
                         val message = Json.encodeToString(update)
-                        delay(sendingDelay)
+                        delay(networkDelay)
                         LOG.info("Sending message to the server: $message")
                         send(message)
                     }
