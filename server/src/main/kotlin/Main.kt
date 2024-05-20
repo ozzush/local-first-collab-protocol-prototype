@@ -49,16 +49,17 @@ class DevServerMain : CliktCommand() {
         server.stop()
         webSocketServer.stop()
         httpServer.stop()
-        val stat = """
+        if (statFile != null) {
+            val stat = "${server.updatesProcessed},${server.rejectedUpdates},${server.syncCalls},${server.failedSyncCalls}"
+            File(statFile!!).writeText(stat)
+        } else {
+            val stat = """
             Total processed updates:      ${server.updatesProcessed}
             Rejected updates:             ${server.rejectedUpdates}
             Total synchronization calls:  ${server.syncCalls}
             Failed synchronization calls: ${server.failedSyncCalls}
             
         """.trimIndent()
-        if (statFile != null) {
-            File(statFile!!).writeText(stat)
-        } else {
             print(stat)
         }
         exitProcess(0)

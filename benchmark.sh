@@ -2,7 +2,7 @@
 
 # Check if correct number of arguments are provided
 if [ "$#" -ne 6 ]; then
-  echo "Usage: $0 duration num_clients update_frequency conflict_frac sending_delay result_file"
+  echo "Usage: $0 duration num_clients update_frequency conflict_frac network_delay result_file"
   exit 1
 fi
 
@@ -11,7 +11,7 @@ duration=$1
 num_clients=$2
 update_frequency=$3
 conflict_frac=$4
-sending_delay=$5
+network_delay=$5
 result_file=$6
 
 echo "Building server and client"
@@ -22,7 +22,7 @@ echo "Building server and client"
 echo "Done!"
 
 # Explain the benchmark
-echo "Running benchmark for $duration seconds with $num_clients clients. Clients generate updates every $update_frequency seconds on average, with a sending delay of $sending_delay seconds. Of these updates, $conflict_frac are conflicts."
+echo "Running benchmark for $duration seconds with $num_clients clients. Clients generate updates every $update_frequency seconds on average, with a sending delay of $network_delay seconds. Of these updates, $conflict_frac are conflicts."
 
 file_path=$PWD/$result_file
 
@@ -53,12 +53,13 @@ start_clients() {
     client_name="Client_$i"
     # Start client and save its PID
     ./gradlew :client:run --args="--name=$client_name --auto-update=$frequency --conflict-frac=$frac --network-delay=$delay" > /dev/null 2>&1 &
+    echo "Started $client_name, pid=$!"
     client_pids+=($!)
   done
 }
 
 # Start clients
-start_clients "$num_clients" "$update_frequency" "$conflict_frac" "$sending_delay"
+start_clients "$num_clients" "$update_frequency" "$conflict_frac" "$network_delay"
 
 # Wait for the server to stop
 wait "$server_pid"
@@ -66,7 +67,12 @@ wait "$server_pid"
 # Kill all client processes
 for pid in "${client_pids[@]}"; do
   kill "$pid"
+  echo "Killed client, pid=$pid"
 done
 
+results=$(cat "$file_path")
+benchmark_row="$duration,$num_clients,$update_frequency,$conflict_frac,$network_delay,$results"
+echo "$benchmark_row" >> benchmark_runs.csv
+
 # Return server output
-cat "$file_path"
+echo "$benchmark_row"
